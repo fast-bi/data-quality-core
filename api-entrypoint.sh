@@ -53,6 +53,9 @@ catch() {
 
 trap 'catch $? $LINENO' EXIT
 
+# Disable re_data anonymous usage / Segment calls
+export RE_DATA_SEND_ANONYMOUS_USAGE_STATS=0
+
 # Create required directories
 mkdir -p /data || {
     echo "Failed to create /data directory" >&2
@@ -112,6 +115,37 @@ log "Cloning dbt Repo"
 git clone "${GITLINK_SECRET}" /data/dbt/ || { log "Failed to clone dbt repository" "ERROR"; exit 1; }
 log "Working on dbt directory"
 cd "/data/dbt/${DBT_REPO_NAME}" || { log "Failed to change to dbt directory" "ERROR"; exit 1; }
+
+# Ensure dbt_project.yml has target-path for re_data compatibility
+DBT_PROJECT_FILE="dbt_project.yml"
+if [ -f "${DBT_PROJECT_FILE}" ]; then
+    if ! grep -q '^[[:space:]]*target-path:' "${DBT_PROJECT_FILE}"; then
+        log "Adding default target-path to ${DBT_PROJECT_FILE} for re_data compatibility"
+        python - << 'PY'
+from pathlib import Path
+
+try:
+    import yaml  # type: ignore
+except ImportError:
+    # Fallback: append a simple line if PyYAML is unavailable
+    path = Path("dbt_project.yml")
+    text = path.read_text()
+    if "target-path" not in text:
+        text = text.rstrip() + "\n\ntarget-path: target\n"
+        path.write_text(text)
+else:
+    path = Path("dbt_project.yml")
+    data = yaml.safe_load(path.read_text()) or {}
+    if "target-path" not in data:
+        data["target-path"] = "target"
+        path.write_text(yaml.safe_dump(data, sort_keys=False))
+PY
+    else
+        log "target-path already present in ${DBT_PROJECT_FILE}"
+    fi
+else
+    log "dbt_project.yml not found in repo root" "WARN"
+fi
 
 # Handle GCP Secret Key
 if [ "${GCP_SECRET_KEY:-false}" == "true" ]; then
