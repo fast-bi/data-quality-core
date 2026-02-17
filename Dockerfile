@@ -40,7 +40,8 @@ ENV PYTHONIOENCODING=utf-8
 ENV LANG=C.UTF-8
 
 # Update python
-RUN python -m pip install --upgrade pip setuptools wheel --no-cache-dir
+# Pin setuptools < 81 to ensure pkg_resources is available for re_data 0.11.0
+RUN python -m pip install --upgrade pip "setuptools<81" wheel yq pytz pandas colorama --no-cache-dir
 
 # Set up work directory
 WORKDIR /usr/app/dbt/
@@ -49,6 +50,8 @@ WORKDIR /usr/app/dbt/
 # dbt packages layer - this will be cached
 ##
 FROM base as dbt-packages
+# Ensure setuptools with pkg_resources is installed before re_data
+RUN python -m pip install --no-cache-dir "setuptools<81"
 RUN python -m pip install --no-cache-dir dbt-bigquery==1.9.2
 RUN python -m pip install --no-cache-dir dbt-snowflake==1.9.4
 RUN python -m pip install --no-cache-dir dbt-redshift==1.9.5
