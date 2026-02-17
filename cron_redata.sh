@@ -95,13 +95,22 @@ log "Updating DBT catalog"
 
 # Check and update dbt_project.yml with target-path: "target" if necessary
 DBT_PROJECT_FILE="/data/dbt/${DBT_REPO_NAME}/dbt_project.yml"
-TARGET_PATH_LINE="target-path: \"target\""
 
-if ! grep -qF "${TARGET_PATH_LINE}" "${DBT_PROJECT_FILE}"; then
-    log "Adding target-path configuration to dbt_project.yml"
-    echo "${TARGET_PATH_LINE}" >> "${DBT_PROJECT_FILE}"
-else
-    log "target-path is already configured in dbt_project.yml"
+if [ -f "${DBT_PROJECT_FILE}" ]; then
+    if command -v yq &> /dev/null; then
+        TARGET_PATH_VALUE=$(yq -r '."target-path" // empty' "${DBT_PROJECT_FILE}" 2>/dev/null || echo "")
+        
+        if [ -z "${TARGET_PATH_VALUE}" ] || [ "${TARGET_PATH_VALUE}" = "null" ] || [ "${TARGET_PATH_VALUE}" = "empty" ]; then
+            log "Adding target-path configuration to dbt_project.yml"
+            yq -Y '."target-path" //= "target"' "${DBT_PROJECT_FILE}" > /tmp/dbt_tmp.yml && mv /tmp/dbt_tmp.yml "${DBT_PROJECT_FILE}"
+            log "Successfully added target-path to ${DBT_PROJECT_FILE}"
+        else
+            log "target-path is already configured in dbt_project.yml"
+        fi
+    else
+        log "yq command not found" "ERROR"
+        exit 1
+    fi
 fi
 
 # Date calculations

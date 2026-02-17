@@ -53,9 +53,6 @@ catch() {
 
 trap 'catch $? $LINENO' EXIT
 
-# Disable re_data anonymous usage / Segment calls
-export RE_DATA_SEND_ANONYMOUS_USAGE_STATS=0
-
 # Create required directories
 mkdir -p /data || {
     echo "Failed to create /data directory" >&2
@@ -119,29 +116,19 @@ cd "/data/dbt/${DBT_REPO_NAME}" || { log "Failed to change to dbt directory" "ER
 # Ensure dbt_project.yml has target-path for re_data compatibility
 DBT_PROJECT_FILE="dbt_project.yml"
 if [ -f "${DBT_PROJECT_FILE}" ]; then
-    if ! grep -q '^[[:space:]]*target-path:' "${DBT_PROJECT_FILE}"; then
-        log "Adding default target-path to ${DBT_PROJECT_FILE} for re_data compatibility"
-        python - << 'PY'
-from pathlib import Path
-
-try:
-    import yaml  # type: ignore
-except ImportError:
-    # Fallback: append a simple line if PyYAML is unavailable
-    path = Path("dbt_project.yml")
-    text = path.read_text()
-    if "target-path" not in text:
-        text = text.rstrip() + "\n\ntarget-path: target\n"
-        path.write_text(text)
-else:
-    path = Path("dbt_project.yml")
-    data = yaml.safe_load(path.read_text()) or {}
-    if "target-path" not in data:
-        data["target-path"] = "target"
-        path.write_text(yaml.safe_dump(data, sort_keys=False))
-PY
+    if command -v yq &> /dev/null; then
+        TARGET_PATH_VALUE=$(yq -r '."target-path" // empty' "${DBT_PROJECT_FILE}" 2>/dev/null || echo "")
+        
+        if [ -z "${TARGET_PATH_VALUE}" ] || [ "${TARGET_PATH_VALUE}" = "null" ] || [ "${TARGET_PATH_VALUE}" = "empty" ]; then
+            log "Adding default target-path to ${DBT_PROJECT_FILE} for re_data compatibility"
+            yq -Y '."target-path" //= "target"' ${DBT_PROJECT_FILE} > /tmp/dbt_tmp.yml && mv /tmp/dbt_tmp.yml ${DBT_PROJECT_FILE}
+            log "Successfully added target-path to ${DBT_PROJECT_FILE}"
+        else
+            log "target-path already present in ${DBT_PROJECT_FILE}"
+        fi
     else
-        log "target-path already present in ${DBT_PROJECT_FILE}"
+        log "yq command not found" "ERROR"
+        exit 1
     fi
 else
     log "dbt_project.yml not found in repo root" "WARN"

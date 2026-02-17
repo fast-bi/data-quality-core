@@ -11,11 +11,17 @@ catch() {
 }
 trap 'catch $? $LINENO' EXIT
 
-init_version="v1.0.8"
+init_version="v0.1.3"
+
+# docker buildx build . \
+#   --pull \
+#   --tag europe-central2-docker.pkg.dev/fast-bi-common/bi-platform/tsb-redata-core:${init_version} \
+#   --platform linux/amd64 \
+#   --push
 
 docker buildx build . \
   --pull \
-  --tag europe-central2-docker.pkg.dev/fast-bi-common/bi-platform/tsb-redata-core:${init_version} \
+  --tag 4fastbi/data-quality-core:${init_version} \
+  --tag 4fastbi/data-quality-core:latest \
   --platform linux/amd64 \
   --push
-
