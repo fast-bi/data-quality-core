@@ -40,7 +40,6 @@ ENV PYTHONIOENCODING=utf-8
 ENV LANG=C.UTF-8
 ENV PYTHONWARNINGS=ignore
 ENV RE_DATA_SEND_ANONYMOUS_USAGE_STATS=0
-ENV DBT_WARN_ERROR_OPTIONS='{"exclude": ["*"]}'
 
 # Pin setuptools < 81 for re_data 0.11.0 (pkg_resources)
 RUN python -m pip install --no-cache-dir --upgrade pip "setuptools<81" wheel
